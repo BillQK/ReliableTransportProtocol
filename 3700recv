@@ -34,7 +34,7 @@ class Receiver:
                 self.log("Received data message %s" % msg)
 
                 # Print out the data to stdout
-                print(msg["data"], end='', flush=True)
+                #print(msg["data"], end='', flush=True)
 
                 # Always send back an ack
                 self.send({ "type": "ack" })
