@@ -4,6 +4,20 @@ import argparse, socket, time, json, select, struct, sys, math
 
 DATA_SIZE = 1375
 
+class SlidingWindow:
+    def __init__(self):
+        self.counter = 1
+
+    def increaseCounter(self):
+        self.counter += 1
+
+    def resetCounter(self):
+        self.counter = 0
+
+    def balancing(self):
+        self.counter = (self.counter + 1)/self.counter        
+
+
 class Sender:
     def __init__(self, host, port):
         self.host = host
@@ -12,6 +26,8 @@ class Sender:
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind(('0.0.0.0', 0))
         self.waiting = False
+        print("started up again")
+        self.Slidingwindow = SlidingWindow()
 
     def log(self, message):
         sys.stderr.write(message + "\n")
@@ -31,9 +47,12 @@ class Sender:
                     msg = k.decode('utf-8')
 
                     self.log("Received message '%s'" % msg)
+                    #print("i got called!")
                     self.waiting = False
                 elif conn == sys.stdin:
+                    counter = 2
                     data = sys.stdin.read(DATA_SIZE)
+                    #print("this is the data being printed" + str(data))
                     if len(data) == 0:
                         self.log("All done!")
                         sys.exit(0)
@@ -41,6 +60,8 @@ class Sender:
                     msg = { "type": "msg", "data": data }
                     self.log("Sending message '%s'" % msg)
                     self.send(msg)
+                    #print("made it down here!")
+                    #decreasee counter, while we don't have anything else to send
                     self.waiting = True
 
         return
