@@ -2,6 +2,7 @@
 
 import argparse, socket, time, json, select, struct, sys, math
 
+
 class Receiver:
     def __init__(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -34,13 +35,13 @@ class Receiver:
                 self.log("Received data message %s" % msg)
 
                 # Print out the data to stdout
-                #print(msg["data"], end='', flush=True)
+                print(msg["data"], end='', flush=True)
 
                 # Always send back an ack
-                self.send({ "type": "ack" })
-
+                self.send({"type": "ack"})
 
         return
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='receive data')

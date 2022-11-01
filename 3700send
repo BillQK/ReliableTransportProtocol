@@ -4,6 +4,7 @@ import argparse, socket, time, json, select, struct, sys, math
 
 DATA_SIZE = 1375
 
+
 class Sender:
     def __init__(self, host, port):
         self.host = host
@@ -21,6 +22,7 @@ class Sender:
         self.socket.sendto(json.dumps(message).encode('utf-8'), (self.host, self.remote_port))
 
     def run(self):
+        slidingWindow = 100
         while True:
             sockets = [self.socket, sys.stdin] if not self.waiting else [self.socket]
 
@@ -33,17 +35,23 @@ class Sender:
                     self.log("Received message '%s'" % msg)
                     self.waiting = False
                 elif conn == sys.stdin:
-                    data = sys.stdin.read(DATA_SIZE)
-                    if len(data) == 0:
-                        self.log("All done!")
-                        sys.exit(0)
+                    c = 0
+                    while c < 2:
+                        data = sys.stdin.read(DATA_SIZE)
+                        if len(data) == 0:
+                            self.log("All done!")
+                            sys.exit(0)
+                            break
 
-                    msg = { "type": "msg", "data": data }
-                    self.log("Sending message '%s'" % msg)
-                    self.send(msg)
-                    self.waiting = True
+                        msg = {"type": "msg", "data": data}
+                        self.log("Sending message '%s'" % msg)
+
+                        self.send(msg)
+                        self.waiting = True
+                        c += 1
 
         return
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='send data')
