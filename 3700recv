@@ -2,6 +2,7 @@
 
 import argparse, socket, time, json, select, struct, sys, math, re
 
+
 class Receiver:
     def __init__(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -27,13 +28,14 @@ class Receiver:
             for conn in socks:
                 data, addr = conn.recvfrom(65535)
 
-                # Grab the remote host/port if we don't alreadt have it
+                # Grab the remote host/port if we don't already have it
                 if self.remote_host is None:
                     self.remote_host = addr[0]
                     self.remote_port = addr[1]
 
                 msg = json.loads(data.decode('utf-8'))
 
+<<<<<<< HEAD
                 pattern = re.compile(r'[0][0][0][0][0]\d\d')
                 match = re.findall(pattern, msg["data"])
                 #print(str(self.LoM))
@@ -51,8 +53,16 @@ class Receiver:
                     print("this is the count "+ str(self.count))
                     print("this is the loM " + str(self.LoM))
 
+=======
+                # Print out the data to stdout
+                print(msg["data"], end='', flush=True)
+
+                # Always send back an ack
+                self.send({"type": "ack"})
+>>>>>>> 9968ba12be3e8edef9a31bbe39305cef0c284f34
 
         return
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='receive data')
