@@ -3,6 +3,20 @@
 import argparse, socket, time, json, select, struct, sys, math, re
 
 
+class SlidingWindow:
+    def __init__(self):
+        self.counter = 1
+
+    def increaseByOne(self):
+        self.counter += 1
+
+    def resetCounter(self):
+        self.counter = 0
+
+    def getCounter(self):
+        return self.counter
+
+
 class Receiver:
     def __init__(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -11,6 +25,7 @@ class Receiver:
         self.log("Bound to port %d" % self.port)
         self.LoM = []
         self.count = 0
+        self.window = SlidingWindow()
 
         self.remote_host = None
         self.remote_port = None
@@ -22,40 +37,34 @@ class Receiver:
         sys.stderr.write(message + "\n")
         sys.stderr.flush()
 
+    def operation(self, conn, counterForReceive):
+        while self.window.getCounter() > counterForReceive:
+            data, addr = conn.recvfrom(65535)
+            if self.remote_host is None:
+                self.remote_host = addr[0]
+                self.remote_port = addr[1]
+
+            msg = json.loads(data.decode('utf-8'))
+
+            substring = msg["data"][13:19]
+            self.count += 1
+
+            if substring not in self.LoM:
+                self.LoM.append(substring)
+                print(msg["data"], end='', flush=True)
+
+            self.log("Received data message %s" % msg)
+            self.send({"type": "ack", "sequence": msg["sequence"]})
+            counterForReceive += 1
+
+        self.window.increaseByOne()
+
     def run(self):
         while True:
             socks = select.select([self.socket], [], [])[0]
             for conn in socks:
-                data, addr = conn.recvfrom(65535)
-
-                # Grab the remote host/port if we don't already have it
-                if self.remote_host is None:
-                    self.remote_host = addr[0]
-                    self.remote_port = addr[1]
-
-                msg = json.loads(data.decode('utf-8'))
-
-                #print("hopefully this works:" + str(msg["sequence"]))
-
-                substring = msg["data"][13:19]
-                #print("this is msg data recieved:" + str(msg))
-                self.count += 1
-
-                #print(str(self.LoM))
-                #how can all the data be transmitted to the point where theres an error, yet it still not work properly
-
-                #new ack
-
-                if(substring not in self.LoM):
-                    #self.count += 1
-                    self.LoM.append(substring)
-
-                    self.log("Received data message %s" % msg)
-                    # Print out the data to stdout
-                    print(msg["data"], end='', flush=True)
-
-                    # Always send back an ack
-                    self.send({ "type": "ack", "sequence": msg["sequence"] })
+                counterForReceive = 0
+                self.operation(conn, counterForReceive)
 
         return
 

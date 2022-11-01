@@ -4,6 +4,21 @@ import argparse, socket, time, json, select, struct, sys, math
 
 DATA_SIZE = 1375
 
+
+class SlidingWindow:
+    def __init__(self):
+        self.counter = 1
+
+    def increaseByOne(self):
+        self.counter += 1
+
+    def resetCounter(self):
+        self.counter = 0
+
+    def getCounter(self):
+        return self.counter
+
+
 class Sender:
     def __init__(self, host, port):
         self.host = host
@@ -11,6 +26,7 @@ class Sender:
         self.log("Sender starting up using port %s" % self.remote_port)
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind(('0.0.0.0', 0))
+        self.window = SlidingWindow()
         self.waiting = False
         self.sequence = 0
         self.LoA = []
@@ -30,67 +46,61 @@ class Sender:
             socks = select.select(sockets, [], [], 0.1)[0]
             for conn in socks:
                 if conn == self.socket:
-                    k, addr = conn.recvfrom(65535)
-                    msg = k.decode('utf-8')
-                    msgtemp = json.loads(msg)
-                    #supposed to handle duplicate acks coming in,
-                    #if the ack is not within our expected acks we do nothing,
-                    # else we then log it and then transmit like normal
-                    if(msgtemp["sequence"] in self.LoA):
-                        self.log("Received message '%s'" % msg)
-                        #evaluate latest ack sent, level 2
-                        #if the same don't bother, go back into sequence if something if missing, 
-                        #then retransmit otherwise ignore
+                    counterForReceive = 0
+                    while self.window.getCounter() > counterForReceive:
+                        k, addr = conn.recvfrom(65535)
+                        msg = k.decode('utf-8')
+                        msgtemp = json.loads(msg)
+                        # supposed to handle duplicate acks coming in,
+                        # if the ack is not within our expected acks we do nothing,
+                        # else we then log it and then transmit like normal
+                        if msgtemp["sequence"] in self.LoA:
+                            self.log("Received message '%s'" % msg)
+                            # evaluate latest ack sent, level 2
+                            # if the same don't bother, go back into sequence if something if missing,
+                            # then retransmit otherwise ignore
 
-                        #maybe the duplicate acks are causing the thing to send more than it thinks it should.
-                        self.LoA.clear()
-                        #remove that entry, 
+                            # maybe the duplicate acks are causing the thing to send more than it thinks it should.
+                            self.LoA.clear()
+                            # remove that entry,
 
-                        self.waiting = False
-                        #heard this ack, 4 messages at once, hear an ack for 1, can send 5, because can't go over message size
-                        #instead of proecessing all at once, once I get an ack, send a new message, packet is no longer wihtin network
+                        counterForReceive += 1
+                    self.waiting = False
+                    self.window.increaseByOne()
 
-                        #out of order, buffer:
-                        #buffer: if we get messages 1,2,3,4 can print them out 1,2,3,4
-                        #if we get 1,4,3,2 then we need to print them out still 1,2,3,4, and so the idea of a buffer is to hold the messages that we have recieved and then print them out in the correct order, 
-                        #order of the sequence number
-                        #we get the seqeuence numbers, just order those in case,
-                        #this should be in the reciever, 
-                    else:
-                        break    
-                    #else: isn't in our ack list that implies tha
+                    # heard this ack, 4 messages at once, hear an ack for 1, can send 5,
+                    # because can't go over message size
+                    # instead of proecessing all at once, once I get an ack, send a new message,
+                    # packet is no longer wihtin network
+
+                    # out of order, buffer:
+                    # buffer: if we get messages 1,2,3,4 can print them out 1,2,3,4
+                    # if we get 1,4,3,2 then we need to print them out still 1,2,3,4, and so the idea of a buffer
+                    # is to hold the messages that we have recieved and then print them out in the correct order,
+                    # order of the sequence number
+                    # we get the seqeuence numbers, just order those in case,
+                    # this should be in the reciever,
+                    # else: isn't in our ack list that implies tha
                     # if we have recieved an ack before, and then we can drop it can do the change of which packets sent, 
-                    # breaking, up to the foor loop and go to the next connection that we are hearing from .    
-
+                    # breaking, up to the foor loop and go to the next connection that we are hearing from .
                 elif conn == sys.stdin:
-                    data = sys.stdin.read(DATA_SIZE)
-                    if len(data) == 0:
-                        self.log("All done!")
-                        sys.exit(0)
-                        break
+                    counterForSend = 0
+                    while self.window.getCounter() > counterForSend:
+                        data = sys.stdin.read(DATA_SIZE)
+                        if len(data) == 0:
+                            self.log("All done!")
+                            sys.exit(0)
+                            break
 
-                    msg = {"type": "msg","sequence": self.sequence,  "data": data}
-                    self.LoA.append(self.sequence)
-                    self.log("Sending message '%s'" % msg)
+                        msg = {"type": "msg", "sequence": self.sequence, "data": data}
+                        self.LoA.append(self.sequence)
+                        self.log("Sending message '%s'" % msg)
 
-                    self.send(msg)
+                        self.send(msg)
+
+                        self.sequence += 1
+                        counterForSend += 1
                     self.waiting = True
-                    self.sequence+= 1
-                    
-                    #c = 0
-                    #while c < 2:
-                    #    data = sys.stdin.read(DATA_SIZE)
-                    #    if len(data) == 0:
-                    #        self.log("All done!")
-                    #       sys.exit(0)
-                    #        break
-
-                    #    msg = {"type": "msg", "data": data}
-                    #    self.log("Sending message '%s'" % msg)
-
-                    #    self.send(msg)
-                    #    self.waiting = True
-                    #    c += 1
 
         return
 
