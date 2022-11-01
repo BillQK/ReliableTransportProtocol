@@ -35,31 +35,27 @@ class Receiver:
 
                 msg = json.loads(data.decode('utf-8'))
 
-<<<<<<< HEAD
-                pattern = re.compile(r'[0][0][0][0][0]\d\d')
-                match = re.findall(pattern, msg["data"])
-                #print(str(self.LoM))
+                #print("hopefully this works:" + str(msg["sequence"]))
 
-                if(match not in self.LoM):
-                    self.count += 1
-                    self.LoM.append(match)
+                substring = msg["data"][13:19]
+                #print("this is msg data recieved:" + str(msg))
+                self.count += 1
+
+                #print(str(self.LoM))
+                #how can all the data be transmitted to the point where theres an error, yet it still not work properly
+
+                #new ack
+
+                if(substring not in self.LoM):
+                    #self.count += 1
+                    self.LoM.append(substring)
 
                     self.log("Received data message %s" % msg)
                     # Print out the data to stdout
                     print(msg["data"], end='', flush=True)
 
                     # Always send back an ack
-                    self.send({ "type": "ack" })
-                    print("this is the count "+ str(self.count))
-                    print("this is the loM " + str(self.LoM))
-
-=======
-                # Print out the data to stdout
-                print(msg["data"], end='', flush=True)
-
-                # Always send back an ack
-                self.send({"type": "ack"})
->>>>>>> 9968ba12be3e8edef9a31bbe39305cef0c284f34
+                    self.send({ "type": "ack", "sequence": msg["sequence"] })
 
         return
 
