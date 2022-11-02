@@ -26,11 +26,11 @@ class Receiver:
         self.socket.bind(('0.0.0.0', 0))
         self.port = self.socket.getsockname()[1]
         self.log("Bound to port %d" % self.port)
-
+        self.currCount = 0
         self.remote_host = None
         self.remote_port = None
         self.MSGPrinted = []
-        self.MSGtoPrint = []
+        self.MSGtoPrint = {}
         self.window = SlidingWindow()
 
     def send(self, message):
@@ -58,14 +58,20 @@ class Receiver:
                     # Always send back an ack
                     self.send({"type": "ack", "seq": msg['seq']})
 
-                    # add to msg to print
-                    self.MSGtoPrint.append(msg['seq'])
+                    if msg['seq'] == self.currCount:
+                        # Print out the data to stdout
+                        print(msg["data"], end='', flush=True)
+                        # Added printed message
+                        self.MSGPrinted.append(msg)
+                        self.currCount += 1
 
-                    # Print out the data to stdout
-                    print(msg["data"], end='', flush=True)
+                    elif self.currCount in self.MSGtoPrint.keys():
+                        print(self.MSGtoPrint.get(self.currCount), end='', flush=True)
+                        self.currCount += 1
+                    else:
+                        # add to msg to print
+                        self.MSGtoPrint[msg['seq']] = msg['data']
 
-                    # Added printed message
-                    self.MSGPrinted.append(msg)
         return
 
 
