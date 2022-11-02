@@ -36,11 +36,7 @@ class Sender:
         self.LoD = []
         self.LoDTBA = {}
         self.LoAR = []
-<<<<<<< HEAD
-        self.amt = 11
-=======
         self.LoT = {}
->>>>>>> cca7336b7f7c11696ffc41ba5bcce7dd44cd6fa1
 
     def log(self, message):
         sys.stderr.write(message + "\n")
@@ -50,7 +46,7 @@ class Sender:
         self.socket.sendto(json.dumps(message).encode('utf-8'), (self.host, self.remote_port))
 
     def receiveAckForAllPacket(self):
-        return len(self.LoAR) == self.amt
+        return self.LoAR == self.seq
 
     def startpackettimer(self, sequence, timer):
         timeout = 1.0
@@ -88,19 +84,6 @@ class Sender:
                         except:
                             self.log("Dropped a packet")        
 
-<<<<<<< HEAD
-                        if(self.receiveAckForAllPacket):
-                            print("reached here")
-                            #for some reason theres some odd mutation going on messing this up.
-                            #either way this approach is buggy and throwing off the amount of acks coming in
-
-                            #print("this message has been called")
-                            #print("the length of loAR: " + str(len(self.LoAR)))
-                            break    
-
-                    self.waiting = False
-=======
->>>>>>> cca7336b7f7c11696ffc41ba5bcce7dd44cd6fa1
 
                 elif conn == sys.stdin:
                     # get all the data to be sent
@@ -127,7 +110,6 @@ class Sender:
 
                         sys.exit(0)
 
-                            
                     # sending window
                     for i in range(0, self.window.getWindow()):
 
