@@ -5,14 +5,37 @@ import argparse, socket, time, json, select, struct, sys, math
 DATA_SIZE = 1375
 
 
+class SlidingWindow:
+    def __init__(self):
+        self.c = 1
+
+    def increaseWindow(self):
+        self.c += 1
+
+    def getWindow(self):
+        return self.c
+
+    def balanceWindow(self):
+        self.c = self.c + 1 / self.c
+
+    def resetWindow(self):
+        self.c = 1
+
+
 class Sender:
     def __init__(self, host, port):
+
         self.host = host
         self.remote_port = int(port)
         self.log("Sender starting up using port %s" % self.remote_port)
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.bind(('0.0.0.0', 0))
         self.waiting = False
+        self.window = SlidingWindow()
+        self.seq = 0
+        self.LoD = []
+        self.LoDTBA = {}
+        self.LoAR = []
 
     def log(self, message):
         sys.stderr.write(message + "\n")
@@ -21,34 +44,67 @@ class Sender:
     def send(self, message):
         self.socket.sendto(json.dumps(message).encode('utf-8'), (self.host, self.remote_port))
 
+    def receiveAckForAllPacket(self):
+        for k, v in self.LoDTBA.items():
+            if k not in self.LoAR:
+                return False
+        return True
+
     def run(self):
-        slidingWindow = 100
         while True:
             sockets = [self.socket, sys.stdin] if not self.waiting else [self.socket]
 
             socks = select.select(sockets, [], [], 0.1)[0]
             for conn in socks:
                 if conn == self.socket:
-                    k, addr = conn.recvfrom(65535)
-                    msg = k.decode('utf-8')
+                    # receiving window
+                    if not self.receiveAckForAllPacket():
+                        k, addr = conn.recvfrom(65535)
+                        msg = k.decode('utf-8')
 
-                    self.log("Received message '%s'" % msg)
-                    self.waiting = False
+                        msg = json.loads(msg)
+                        self.log("Received message '%s'" % msg)
+
+                        self.LoAR.append(msg['seq'])
+
+                    else:
+                        self.waiting = False
+                        self.window.increaseWindow()
+
                 elif conn == sys.stdin:
-                    c = 0
-                    while c < 2:
+                    # get all the data to be sent
+                    while True:
                         data = sys.stdin.read(DATA_SIZE)
                         if len(data) == 0:
-                            self.log("All done!")
-                            sys.exit(0)
+                            break
+                        self.LoD.append(data)
+
+                    # check if all data is already send
+                    if self.seq == len(self.LoD):
+                        self.log("All done!")
+                        sys.exit(0)
+
+                    # sending window
+                    for i in range(0, self.window.getWindow()):
+
+                        if self.seq < len(self.LoD):
+                            # get data from seq
+                            data = self.LoD[self.seq]
+                        else:
                             break
 
-                        msg = {"type": "msg", "data": data}
+                        msg = {"type": "msg", "seq": self.seq, "data": data}
+
                         self.log("Sending message '%s'" % msg)
 
                         self.send(msg)
-                        self.waiting = True
-                        c += 1
+
+                        self.seq += 1
+
+                        # add to data to be ack
+                        self.LoDTBA[msg['seq']] = data
+
+                    self.waiting = True
 
         return
 

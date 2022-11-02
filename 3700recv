@@ -3,6 +3,23 @@
 import argparse, socket, time, json, select, struct, sys, math
 
 
+class SlidingWindow:
+    def __init__(self):
+        self.c = 1
+
+    def increaseWindow(self):
+        self.c += 1
+
+    def getWindow(self):
+        return self.c
+
+    def balanceWindow(self):
+        self.c = self.c + 1 / self.c
+
+    def resetWindow(self):
+        self.c = 1
+
+
 class Receiver:
     def __init__(self):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -12,6 +29,9 @@ class Receiver:
 
         self.remote_host = None
         self.remote_port = None
+        self.MSGPrinted = []
+        self.MSGtoPrint = []
+        self.window = SlidingWindow()
 
     def send(self, message):
         self.socket.sendto(json.dumps(message).encode('utf-8'), (self.remote_host, self.remote_port))
@@ -34,12 +54,18 @@ class Receiver:
                 msg = json.loads(data.decode('utf-8'))
                 self.log("Received data message %s" % msg)
 
-                # Print out the data to stdout
-                print(msg["data"], end='', flush=True)
+                if msg['seq'] not in self.MSGtoPrint:
+                    # Always send back an ack
+                    self.send({"type": "ack", "seq": msg['seq']})
 
-                # Always send back an ack
-                self.send({"type": "ack"})
+                    # add to msg to print
+                    self.MSGtoPrint.append(msg['seq'])
 
+                    # Print out the data to stdout
+                    print(msg["data"], end='', flush=True)
+
+                    # Added printed message
+                    self.MSGPrinted.append(msg)
         return
 
 
