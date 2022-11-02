@@ -16,7 +16,7 @@ class SlidingWindow:
         return self.c
 
     def balanceWindow(self):
-        self.c = self.c + 1 / self.c
+        self.c = int(self.c + 1 / self.c)
 
     def resetWindow(self):
         self.c = 1
@@ -45,10 +45,7 @@ class Sender:
         self.socket.sendto(json.dumps(message).encode('utf-8'), (self.host, self.remote_port))
 
     def receiveAckForAllPacket(self):
-        for k, v in self.LoDTBA.items():
-            if k not in self.LoAR:
-                return False
-        return True
+        return self.LoAR == self.seq
 
     def run(self):
         while True:
@@ -58,18 +55,19 @@ class Sender:
             for conn in socks:
                 if conn == self.socket:
                     # receiving window
-                    if not self.receiveAckForAllPacket():
+                    for i in range(0, self.window.getWindow()):
                         k, addr = conn.recvfrom(65535)
                         msg = k.decode('utf-8')
 
                         msg = json.loads(msg)
                         self.log("Received message '%s'" % msg)
 
-                        self.LoAR.append(msg['seq'])
+                        if msg['seq'] not in self.LoAR:
+                            self.LoAR.append(msg['seq'])
+                            del self.LoDTBA[msg['seq']]
 
-                    else:
-                        self.waiting = False
-                        self.window.increaseWindow()
+                    self.waiting = False
+                    self.window.increaseWindow()
 
                 elif conn == sys.stdin:
                     # get all the data to be sent
@@ -105,6 +103,7 @@ class Sender:
                         self.LoDTBA[msg['seq']] = data
 
                     self.waiting = True
+
 
         return
 
