@@ -36,6 +36,7 @@ class Sender:
         self.LoD = []
         self.LoDTBA = {}
         self.LoAR = []
+        self.amt = 11
 
     def log(self, message):
         sys.stderr.write(message + "\n")
@@ -45,7 +46,7 @@ class Sender:
         self.socket.sendto(json.dumps(message).encode('utf-8'), (self.host, self.remote_port))
 
     def receiveAckForAllPacket(self):
-        return self.LoAR == self.seq
+        return len(self.LoAR) == self.amt
 
     def run(self):
         while True:
@@ -65,6 +66,15 @@ class Sender:
                         if msg['seq'] not in self.LoAR:
                             self.LoAR.append(msg['seq'])
                             del self.LoDTBA[msg['seq']]
+
+                        if(self.receiveAckForAllPacket):
+                            print("reached here")
+                            #for some reason theres some odd mutation going on messing this up.
+                            #either way this approach is buggy and throwing off the amount of acks coming in
+
+                            #print("this message has been called")
+                            #print("the length of loAR: " + str(len(self.LoAR)))
+                            break    
 
                     self.waiting = False
                     self.window.increaseWindow()
