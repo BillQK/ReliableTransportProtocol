@@ -7,7 +7,7 @@ DATA_SIZE = 1375
 
 class SlidingWindow:
     def __init__(self):
-        self.c = 4
+        self.c = 2
 
     def increaseWindow(self):
         self.c += 1
