@@ -65,12 +65,13 @@ class Receiver:
                         self.MSGPrinted.append(msg)
                         self.currCount += 1
 
-                    elif self.currCount in self.MSGtoPrint.keys():
+                    while self.currCount in self.MSGtoPrint.keys():
                         print(self.MSGtoPrint.get(self.currCount), end='', flush=True)
                         self.currCount += 1
+
                     else:
-                        # add to msg to print
                         self.MSGtoPrint[msg['seq']] = msg['data']
+
 
         return
 
