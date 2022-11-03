@@ -7,7 +7,7 @@ DATA_SIZE = 1375
 
 class SlidingWindow:
     def __init__(self):
-        self.c = 2
+        self.c = 4
 
     def increaseWindow(self):
         self.c += 1
@@ -86,8 +86,8 @@ class Sender:
                                 self.log("Dropped a packet")
 
                         except socket.timeout as err:
-                            #once we get a socket timeout, we need to retransmit something...
-                            #therefore we switch to that section...
+                            # once we get a socket timeout, we need to retransmit something...
+                            # therefore we switch to that section...
                             self.waiting = False
 
                 elif conn == sys.stdin:
@@ -99,8 +99,7 @@ class Sender:
 
                         self.LoD.append(data)
 
-                    print("this is what our list of time looks like at each interval: " + str(self.LoT))    
-
+                    print("this is what our list of time looks like at each interval: " + str(self.LoT))
 
                     # check if all data is already send
                     if self.seq == len(self.LoD):
@@ -108,24 +107,26 @@ class Sender:
 
                         sys.exit(0)
 
+                    if len(self.LoT) > 0:
+                        for k, v in self.LoT.items():
+                            if time.time() - v > 1.0:
+                                data1 = self.LoD[k]
+                                # print("made it here:" + str(k))
+                                # it works ish, but some of the acks don't come in and not sure why,
+                                # for instance with the tests, 8 and 10 didn't come in although the data was sent
+                                # and waiting on acks for those.
+                                msg1 = {"type": "msg", "seq": k, "data": data1}
+                                self.send(msg1)
+                        break
+
                     # sending window
                     for i in range(0, self.window.getWindow()):
 
-                        if(len(self.LoT) > 0):
-                            for k,v in self.LoT.items():
-                                if(time.time() - v > 1.0):
-                                    data1 = self.LoD[k]
-                                    #print("made it here:" + str(k))
-                                    #it works ish, but some of the acks don't come in and not sure why,
-                                    #for instance with the tests, 8 and 10 didn't come in although the data was sent 
-                                    #and waiting on acks for those.
-                                    msg1= {"type": "msg", "seq": k, "data": data1}
-                                    self.send(msg1)  
 
                         if self.seq < len(self.LoD):
                             # get data from seq
                             data = self.LoD[self.seq]
-                            #hashing = hashlib.md5(data.encode('utf-8')).hexdigest()
+                            # hashing = hashlib.md5(data.encode('utf-8')).hexdigest()
 
                         else:
                             break

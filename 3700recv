@@ -44,42 +44,45 @@ class Receiver:
         while True:
             socks = select.select([self.socket], [], [])[0]
             for conn in socks:
-                data, addr = conn.recvfrom(65535)
+                try:
+                    data, addr = conn.recvfrom(65535)
+                    self.socket.settimeout(1.0)
 
-                # Grab the remote host/port if we don't already have it
-                if self.remote_host is None:
-                    self.remote_host = addr[0]
-                    self.remote_port = addr[1]
-    
-                msg = json.loads(data.decode('utf-8'))
+                    # Grab the remote host/port if we don't already have it
+                    if self.remote_host is None:
+                        self.remote_host = addr[0]
+                        self.remote_port = addr[1]
 
-                #if(hashlib.md5(msg['data'].encode('utf-8')).hexdigest() != msg['checksum']):
-                #    print("this condition hit")
-                #    self.log("Corrupted packet dropped")
-                #    break
-                
-                #print("this is the currentCount for our acks" + str(self.currCount))
+                    msg = json.loads(data.decode('utf-8'))
 
-                self.log("Received data message %s" % msg)
+                    #if(hashlib.md5(msg['data'].encode('utf-8')).hexdigest() != msg['checksum']):
+                    #    print("this condition hit")
+                    #    self.log("Corrupted packet dropped")
+                    #    break
 
-                if msg['seq'] not in self.MSGtoPrint:
-                    # Always send back an ack
-                    self.send({"type": "ack", "seq": msg['seq']})
+                    #print("this is the currentCount for our acks" + str(self.currCount))
 
-                    if msg['seq'] == self.currCount:
-                        # Print out the data to stdout
-                        print(msg["data"], end='', flush=True)
-                        # Added printed message
-                        self.MSGPrinted.append(msg)
-                        self.currCount += 1
+                    self.log("Received data message %s" % msg)
 
-                    while self.currCount in self.MSGtoPrint.keys():
-                        print(self.MSGtoPrint.get(self.currCount), end='', flush=True)
-                        self.currCount += 1
+                    if msg['seq'] not in self.MSGtoPrint:
+                        # Always send back an ack
+                        self.send({"type": "ack", "seq": msg['seq']})
 
-                    else:
-                        self.MSGtoPrint[msg['seq']] = msg['data']
+                        if msg['seq'] == self.currCount:
+                            # Print out the data to stdout
+                            print(msg["data"], end='', flush=True)
+                            # Added printed message
+                            self.MSGPrinted.append(msg)
+                            self.currCount += 1
 
+                        while self.currCount in self.MSGtoPrint.keys():
+                            print(self.MSGtoPrint.get(self.currCount), end='', flush=True)
+                            self.currCount += 1
+
+                        else:
+                            self.MSGtoPrint[msg['seq']] = msg['data']
+                except socket.timeout as err:
+                    continue
 
 
         return
