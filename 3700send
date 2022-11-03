@@ -66,24 +66,30 @@ class Sender:
                 if conn == self.socket:
                     # receiving window
                     for i in range(0, self.window.getWindow()):
-                        k, addr = conn.recvfrom(65535)
-                        msg = k.decode('utf-8')
+                        self.socket.settimeout(1.0)
 
                         try:
-                            msg = json.loads(msg)
-                            self.log("Received message '%s'" % msg)
+                            k, addr = conn.recvfrom(65535)
+                            msg = k.decode('utf-8')
+                            try:
+                                msg = json.loads(msg)
+                                self.log("Received message '%s'" % msg)
 
-                            self.LoAR.append(msg['seq'])
+                                self.LoAR.append(msg['seq'])
 
-                            if msg['seq'] in self.LoDTBA:
-                                del self.LoDTBA[msg['seq']]
-                                del self.LoT[msg['seq']]
+                                if msg['seq'] in self.LoDTBA:
+                                    del self.LoDTBA[msg['seq']]
+                                    del self.LoT[msg['seq']]
 
-                            self.waiting = False    
+                                self.waiting = False    
 
-                        except:
-                            self.log("Dropped a packet")        
-
+                            except:
+                                self.log("Dropped a packet")
+                        
+                        except socket.timeout as err:
+                            #once we get a socket timeout, we need to retransmit something...
+                            #therefore we switch to that section...
+                            self.waiting = False        
 
                 elif conn == sys.stdin:
                     # get all the data to be sent
@@ -92,17 +98,10 @@ class Sender:
                         if len(data) == 0:
                             break
 
-                        print("this is the data: " + data)
-                        #hashing = hashlib.md5(data.encode('utf-8')).hexdigest()
                         self.LoD.append(data)
 
-                    if(len(self.LoT) > 0):
-                        print("hit this area")
-                        for k,v in self.LoT.items():
-                            if(time.time() - v > 1.0):
-                                data1 = self.LoD[k]
-                                msg1= {"type": "msg", "seq": k, "data": data1}
-                                self.send(msg1)    
+                    print("this is what our list of time looks like at each interval: " + str(self.LoT))    
+  
 
                     # check if all data is already send
                     if self.seq == len(self.LoD):
@@ -113,9 +112,22 @@ class Sender:
                     # sending window
                     for i in range(0, self.window.getWindow()):
 
+                        if(len(self.LoT) > 0):
+                            for k,v in self.LoT.items():
+                                if(time.time() - v > 1.0):
+                                    data1 = self.LoD[k]
+                                    #print("made it here:" + str(k))
+                                    #it works ish, but some of the acks don't come in and not sure why,
+                                    #for instance with the tests, 8 and 10 didn't come in although the data was sent 
+                                    #and waiting on acks for those.
+                                    msg1= {"type": "msg", "seq": k, "data": data1}
+                                    self.send(msg1)  
+
                         if self.seq < len(self.LoD):
                             # get data from seq
                             data = self.LoD[self.seq]
+                            #hashing = hashlib.md5(data.encode('utf-8')).hexdigest()
+
                         else:
                             break
 

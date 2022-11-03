@@ -54,9 +54,11 @@ class Receiver:
                 msg = json.loads(data.decode('utf-8'))
 
                 #if(hashlib.md5(msg['data'].encode('utf-8')).hexdigest() != msg['checksum']):
+                #    print("this condition hit")
                 #    self.log("Corrupted packet dropped")
                 #    break
-
+                
+                #print("this is the currentCount for our acks" + str(self.currCount))
 
                 self.log("Received data message %s" % msg)
 
