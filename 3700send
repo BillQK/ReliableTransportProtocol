@@ -4,10 +4,11 @@ import argparse, socket, time, json, select, struct, sys, math
 
 DATA_SIZE = 1375
 
+
 class SlidingWindow:
     def __init__(self):
         self.c = 4
-        #self.windowlength = 4
+        # self.windowlength = 4
 
     def increaseWindow(self):
         self.c += 1
@@ -16,7 +17,7 @@ class SlidingWindow:
         return self.c
 
     def balanceWindow(self):
-        self.c = int(self.c  / 2)
+        self.c = int(self.c / 2)
 
     def decreaseWindow(self):
         self.c -= 1
@@ -58,9 +59,6 @@ class Sender:
             for conn in socks:
                 if conn == self.socket:
 
-                    self.socket.settimeout(1.0)
-                    print("did this step and set a timeout")
-
                     try:
                         k, addr = conn.recvfrom(65535)
                         msg = k.decode('utf-8')
@@ -76,13 +74,8 @@ class Sender:
 
                         self.window.increaseWindow()
                         self.waiting = False
-                        
-                    except socket.timeout as err:
-                        print("made it into here!")
-                        self.retransmit = True
-                        self.waiting  = False
-                        self.window.increaseWindow()
-  
+                    except:
+                        self.log("Error")
 
                 elif conn == sys.stdin:
                     # get all the data to be sent
@@ -93,45 +86,40 @@ class Sender:
                         self.LoD.append(data)
 
                     # check if all data is already send
-                    if self.seq == len(self.LoD):
+                    if self.seq == len(self.LoD) and len(self.LoDTBA) == 0:
                         self.log("All done!")
 
                         sys.exit(0)
 
                     while self.window.getWindow() > 0:
-                        if self.retransmit:
-                            print("condition hit")
-                            print("this is what is in our list currently: " +  str(self.LoT))
-                            for k, v in self.LoT.items():
-                                if(time.time() - v > self.rtt):
-                                    data = self.LoD[k]
-                                    msg = {"type" : "msg", "seq" : k,  "data": data }
-                                    print("this is the messsage that we created: "+ str(msg))
-                                    self.send(msg)
-                                    self.window.decreaseWindow()
+                        if self.seq < len(self.LoD):
+                            # get data from seq
+                            data = self.LoD[self.seq]
                         else:
-                            if self.seq < len(self.LoD):
-                                # get data from seq
-                                data = self.LoD[self.seq]
-                            else:
-                                break
+                            break
 
-                            msg = {"type": "msg", "seq": self.seq, "data": data}
+                        msg = {"type": "msg", "seq": self.seq, "data": data}
 
-                            self.log("Sending message '%s'" % msg)
+                        self.log("Sending message '%s'" % msg)
 
-                            self.send(msg)
-                            self.LoT[self.seq] = time.time()
+                        self.send(msg)
+                        self.LoT[self.seq] = time.time() + self.rtt
 
-                            self.seq += 1
+                        self.seq += 1
 
-                            # add to data to be ack
-                            self.LoDTBA[msg['seq']] = data
-                            #we have a to be acked
-                            self.window.decreaseWindow()
+                        # add to data to be ack
+                        self.LoDTBA[msg['seq']] = data
 
+                        # we have a to be acked
+                        self.window.decreaseWindow()
                     self.waiting = True
 
+            for k, v in self.LoDTBA.items():
+                if time.time() > self.LoT.get(k):
+                    msg = {"type": "msg", "seq": k, "data": v}
+                    self.log("Sending message '%s'" % msg)
+                    self.send(msg)
+                    self.LoT[k] = time.time() + self.rtt
 
         return
 
