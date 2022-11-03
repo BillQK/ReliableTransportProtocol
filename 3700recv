@@ -1,6 +1,7 @@
 #!/usr/bin/env -S python3 -u
 
 import argparse, socket, time, json, select, struct, sys, math
+import hashlib
 
 
 class SlidingWindow:
@@ -44,39 +45,42 @@ class Receiver:
         while True:
             socks = select.select([self.socket], [], [])[0]
             for conn in socks:
-                data, addr = conn.recvfrom(65535)
 
-                # Grab the remote host/port if we don't already have it
-                if self.remote_host is None:
-                    self.remote_host = addr[0]
-                    self.remote_port = addr[1]
+                    data, addr = conn.recvfrom(65535)
 
-                msg = json.loads(data.decode('utf-8'))
-                self.log("Received data message %s" % msg)
+                    # Grab the remote host/port if we don't already have it
+                    if self.remote_host is None:
+                        self.remote_host = addr[0]
+                        self.remote_port = addr[1]
 
-                #print("this is the current count of acks we have:" + str(self.currCount))
+                    msg = json.loads(data.decode('utf-8'))
 
-                #if msg['seq'] not in self.MSGtoPrint:
-                #    # Always send back an ack, so we always send the fact that we got the packet at the sequence,
-                #the reciever on the send has to deal with opening the packets correctly.
-                self.send({"type": "ack", "seq": msg['seq']}) 
-                
-                    
-                if msg['seq'] == self.currCount:
-                    # Print out the data to stdout
-                    print(msg["data"], end='', flush=True)
-                    # Added printed message
-                    self.MSGPrinted.append(msg)
-                    self.currCount += 1
+                    if not (hashlib.md5(msg['data'].encode("utf-8")).hexdigest() == msg['hash']):
+                        self.log("Received Error Data Packet")
+                        break
+                    else:
+                        self.log("Received data message %s" % msg)
 
-                while self.currCount in self.MSGtoPrint.keys():
-                    print(self.MSGtoPrint.get(self.currCount), end='', flush=True)
-                    self.currCount += 1
+                        # print("this is the current count of acks we have:" + str(self.currCount))
 
-                else:
-                    self.MSGtoPrint[msg['seq']] = msg['data']
+                        # if msg['seq'] not in self.MSGtoPrint:
+                        #    # Always send back an ack, so we always send the fact that we got the packet at the sequence,
+                        # the reciever on the send has to deal with opening the packets correctly.
+                        self.send({"type": "ack", "seq": msg['seq']})
 
+                        if msg['seq'] == self.currCount:
+                            # Print out the data to stdout
+                            print(msg["data"], end='', flush=True)
+                            # Added printed message
+                            self.MSGPrinted.append(msg)
+                            self.currCount += 1
 
+                        while self.currCount in self.MSGtoPrint.keys():
+                            print(self.MSGtoPrint.get(self.currCount), end='', flush=True)
+                            self.currCount += 1
+
+                        else:
+                            self.MSGtoPrint[msg['seq']] = msg['data']
         return
 
 

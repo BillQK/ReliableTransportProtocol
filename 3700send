@@ -1,6 +1,7 @@
 #!/usr/bin/env -S python3 -u
 
 import argparse, socket, time, json, select, struct, sys, math
+import hashlib
 
 DATA_SIZE = 1375
 
@@ -8,7 +9,6 @@ DATA_SIZE = 1375
 class SlidingWindow:
     def __init__(self):
         self.c = 4
-        # self.windowlength = 4
 
     def increaseWindow(self):
         self.c += 1
@@ -38,7 +38,6 @@ class Sender:
         self.LoDTBA = {}
         self.LoAR = []
         self.rtt = 1.0
-        self.retransmit = False
         self.LoT = {}
 
     def log(self, message):
@@ -74,6 +73,7 @@ class Sender:
 
                         self.window.increaseWindow()
                         self.waiting = False
+
                     except:
                         self.log("Error")
 
@@ -98,7 +98,8 @@ class Sender:
                         else:
                             break
 
-                        msg = {"type": "msg", "seq": self.seq, "data": data}
+                        msg = {"type": "msg", "seq": self.seq, "data": data, "hash": hashlib.md5(data.encode('utf-8'))
+                            .hexdigest()}
 
                         self.log("Sending message '%s'" % msg)
 
@@ -116,10 +117,11 @@ class Sender:
 
             for k, v in self.LoDTBA.items():
                 if time.time() > self.LoT.get(k):
-                    msg = {"type": "msg", "seq": k, "data": v}
+                    msg = {"type": "msg", "seq": k, "data": v, "hash": hashlib.md5(v.encode('utf-8')).hexdigest()}
                     self.log("Sending message '%s'" % msg)
                     self.send(msg)
                     self.LoT[k] = time.time() + self.rtt
+                    self.window.balanceWindow()
 
         return
 
