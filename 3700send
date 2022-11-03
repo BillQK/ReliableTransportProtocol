@@ -4,8 +4,6 @@ import argparse, socket, time, json, select, struct, sys, math
 
 DATA_SIZE = 1375
 
-#we have a window of buffer space to send items, then once items comes back in we should 
-# transmit agains since there is room in the window
 class SlidingWindow:
     def __init__(self):
         self.c = 4
@@ -83,6 +81,7 @@ class Sender:
                         print("made it into here!")
                         self.retransmit = True
                         self.waiting  = False
+                        self.window.increaseWindow()
   
 
                 elif conn == sys.stdin:
@@ -101,6 +100,7 @@ class Sender:
 
                     while self.window.getWindow() > 0:
                         if self.retransmit:
+                            print("condition hit")
                             print("this is what is in our list currently: " +  str(self.LoT))
                             for k, v in self.LoT.items():
                                 if(time.time() - v > self.rtt):
