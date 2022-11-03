@@ -46,7 +46,7 @@ class Sender:
         self.socket.sendto(json.dumps(message).encode('utf-8'), (self.host, self.remote_port))
 
     def receiveAckForAllPacket(self):
-        return len(self.LoAR) == self.amt
+        return self.LoAR == self.seq
 
     def startpackettimer(self, sequence, timer):
         timeout = 1.0
@@ -79,9 +79,8 @@ class Sender:
                                 del self.LoT[msg['seq']]
 
                             self.waiting = False
-
-                        except:
-                            self.log("Dropped a packet")
+                        except TypeError:
+                            self.log("Error packet")
 
                 elif conn == sys.stdin:
                     # get all the data to be sent
