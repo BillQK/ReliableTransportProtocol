@@ -36,6 +36,8 @@ class Sender:
         self.LoD = []
         self.LoDTBA = {}
         self.LoAR = []
+        self.rtt = 1.0
+        self.retransmit = False
 
     def log(self, message):
         sys.stderr.write(message + "\n")
@@ -54,20 +56,28 @@ class Sender:
             socks = select.select(sockets, [], [], 0.1)[0]
             for conn in socks:
                 if conn == self.socket:
-                    # receiving window
-                    for i in range(0, self.window.getWindow()):
-                        k, addr = conn.recvfrom(65535)
-                        msg = k.decode('utf-8')
+                    try:
+                        conn.settimeout(self.rtt)
+                        # receiving window
+                        for i in range(0, self.window.getWindow()):
+                            k, addr = conn.recvfrom(65535)
+                            msg = k.decode('utf-8')
 
-                        msg = json.loads(msg)
-                        self.log("Received message '%s'" % msg)
+                            msg = json.loads(msg)
+                            self.log("Received message '%s'" % msg)
 
-                        self.LoAR.append(msg['seq'])
+                            self.LoAR.append(msg['seq'])
 
-                        if msg['seq'] in self.LoDTBA:
-                            del self.LoDTBA[msg['seq']]
+                            if msg['seq'] in self.LoDTBA:
+                                del self.LoDTBA[msg['seq']]
+                            #but if we don't get the sequence back then we can 
+                            #retransmit the given packet for the next highest sequence number that hasn't been acked.     
 
-                    self.waiting = False
+                        self.waiting = False
+                        
+                    except:
+                        self.retransmit = True
+                        self.waiting  = False   
 
                 elif conn == sys.stdin:
                     # get all the data to be sent
@@ -82,6 +92,19 @@ class Sender:
                         self.log("All done!")
 
                         sys.exit(0)
+
+                    #we need to have to have some way of knowing that we need to retransmit a packet    
+                    if self.retransmit:
+                        print("made it here!")
+                        #we need to get the correct data packet associated
+                        #counter, and then increase from 0 to sequence is, loDa it will be in order
+                        print("this is in our list: " + str(self.LoAR))
+                        latestunacked = len(self.LoAR)
+                        data = self.LoD[latestunacked] 
+                        msg = {"type" : "msg", "seq" : latestunacked, "data": data }
+                        print("this is the messsage that we created: "+ str(msg))
+                        self.send(msg)
+                        self.retransmit = False
 
                     # sending window
                     for i in range(0, self.window.getWindow()):
@@ -102,6 +125,7 @@ class Sender:
 
                         # add to data to be ack
                         self.LoDTBA[msg['seq']] = data
+                        #we have a to be acked
 
                     self.waiting = True
 
