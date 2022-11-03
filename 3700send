@@ -4,10 +4,20 @@ import argparse, socket, time, json, select, struct, sys, math
 
 DATA_SIZE = 1375
 
+# how to handles acks
+    # send out an ack every time or just ignore the duplicates message
+    # if send out an ack every time -> ignore the duplicates ack
+    # why our data is not receiving correct if the implement to send out an ack every time
+
+# try catch socket for timeout
+# how to use the RTT or time.time() round trip thing
+# sliding window ?
+# how to retransmit ? logic behind it ?
+
 
 class SlidingWindow:
     def __init__(self):
-        self.c = 4
+        self.c = 2
 
     def increaseWindow(self):
         self.c += 1
@@ -62,7 +72,7 @@ class Sender:
                         for i in range(0, self.window.getWindow()):
                             k, addr = conn.recvfrom(65535)
                             msg = k.decode('utf-8')
-
+                            # maybe blocking out the duplicates ack
                             msg = json.loads(msg)
                             self.log("Received message '%s'" % msg)
 
