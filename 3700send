@@ -4,10 +4,12 @@ import argparse, socket, time, json, select, struct, sys, math
 
 DATA_SIZE = 1375
 
-
+#we have a window of buffer space to send items, then once items comes back in we should 
+# transmit agains since there is room in the window
 class SlidingWindow:
     def __init__(self):
-        self.c = 2
+        self.c = 4
+        #self.windowlength = 4
 
     def increaseWindow(self):
         self.c += 1
@@ -16,10 +18,10 @@ class SlidingWindow:
         return self.c
 
     def balanceWindow(self):
-        self.c = int(self.c + 1 / self.c)
+        self.c = int(self.c  / 2)
 
-    def resetWindow(self):
-        self.c = 1
+    def decreaseWindow(self):
+        self.c -= 1
 
 
 class Sender:
@@ -57,24 +59,11 @@ class Sender:
             socks = select.select(sockets, [], [], 0.1)[0]
             for conn in socks:
                 if conn == self.socket:
+
+                    self.socket.settimeout(1.0)
+                    print("did this step and set a timeout")
+
                     try:
-                        #use rtt on each packet instead, only check the times from past retransmissions,
-                        #check rtt log, then packet has been dropped,
-                        #make sure to keep track the logs of the packets and check the times, append the rtt log
-                        #keep another structure for that, just a table, rtt log will keep the start time, and based on that time
-                        #we can compare with the rtt whether the time has been dropped, 
-
-                        #one queue message queue, slider over the whole queue, size four, and that is limit on queue on messages
-                        #currently we have four and if there are any missing acks resend but if succesful window has been completed 
-                        #then we shift, based on having too many drops, then we will 
-                        # increment/divide window size based on the droppped packet size
-
-                        #receiving window
-                        #without the window the packets come back in wayyy too fast
-
-
-                        self.socket.settimeout(self.rtt)
-                        #for i in range(0, self.window.getWindow()):
                         k, addr = conn.recvfrom(65535)
                         msg = k.decode('utf-8')
 
@@ -86,16 +75,15 @@ class Sender:
                         if msg['seq'] in self.LoDTBA:
                             del self.LoDTBA[msg['seq']]
                             del self.LoT[msg['seq']]
-                            #but if we don't get the sequence back then we can 
-                            #retransmit the given packet for the next highest sequence number that hasn't been acked.  
 
+                        self.window.increaseWindow()
                         self.waiting = False
                         
-                    except:
-                        #print("made it into here!")
+                    except socket.timeout as err:
+                        print("made it into here!")
                         self.retransmit = True
                         self.waiting  = False
-                        break   
+  
 
                 elif conn == sys.stdin:
                     # get all the data to be sent
@@ -111,49 +99,36 @@ class Sender:
 
                         sys.exit(0)
 
-                    #we need to have to have some way of knowing that we need to retransmit a packet 
-                    # why doesn't this part    
-                    if self.retransmit:
-                        for k, v in self.LoT.items():
-                            if(time.time() - v > self.rtt):
-                                data = self.LoD[k]
-                                msg = {"type" : "msg", "seq" : k,  "data": data }
-                                print("this is the messsage that we created: "+ str(msg))
-                                self.send(msg)
-
-
-                        #we need to get the correct data packet associated
-                        #counter, and then increase from 0 to sequence is, loDa it will be in order
-                        #latestunacked = len(self.LoAR)
-                        #data = self.LoD[latestunacked] 
-                    
-                        self.retransmit = False
-                        self.waiting = True
-                        break
-                    #check for rtt, whether differnce difference is 
-
-                    # sending window
-                    #keep track of packet number we are sending in the window,
-                    # or just shifting whole window for next four
-                    for i in range(0, self.window.getWindow()):
-                        if self.seq < len(self.LoD):
-                            # get data from seq
-                            data = self.LoD[self.seq]
+                    while self.window.getWindow() > 0:
+                        if self.retransmit:
+                            print("this is what is in our list currently: " +  str(self.LoT))
+                            for k, v in self.LoT.items():
+                                if(time.time() - v > self.rtt):
+                                    data = self.LoD[k]
+                                    msg = {"type" : "msg", "seq" : k,  "data": data }
+                                    print("this is the messsage that we created: "+ str(msg))
+                                    self.send(msg)
+                                    self.window.decreaseWindow()
                         else:
-                            break
+                            if self.seq < len(self.LoD):
+                                # get data from seq
+                                data = self.LoD[self.seq]
+                            else:
+                                break
 
-                        msg = {"type": "msg", "seq": self.seq, "data": data}
+                            msg = {"type": "msg", "seq": self.seq, "data": data}
 
-                        self.log("Sending message '%s'" % msg)
+                            self.log("Sending message '%s'" % msg)
 
-                        self.send(msg)
-                        self.LoT[self.seq] = time.time()
+                            self.send(msg)
+                            self.LoT[self.seq] = time.time()
 
-                        self.seq += 1
+                            self.seq += 1
 
-                        # add to data to be ack
-                        self.LoDTBA[msg['seq']] = data
-                        #we have a to be acked
+                            # add to data to be ack
+                            self.LoDTBA[msg['seq']] = data
+                            #we have a to be acked
+                            self.window.decreaseWindow()
 
                     self.waiting = True
 

@@ -54,27 +54,27 @@ class Receiver:
                 msg = json.loads(data.decode('utf-8'))
                 self.log("Received data message %s" % msg)
 
-                #print("this is the current count of acks we have:" + str(self.currCount)) 
+                #print("this is the current count of acks we have:" + str(self.currCount))
 
-                if msg['seq'] not in self.MSGtoPrint:
-                    # Always send back an ack
+                #if msg['seq'] not in self.MSGtoPrint:
+                #    # Always send back an ack, so we always send the fact that we got the packet at the sequence,
+                #the reciever on the send has to deal with opening the packets correctly.
+                self.send({"type": "ack", "seq": msg['seq']}) 
+                
                     
+                if msg['seq'] == self.currCount:
+                    # Print out the data to stdout
+                    print(msg["data"], end='', flush=True)
+                    # Added printed message
+                    self.MSGPrinted.append(msg)
+                    self.currCount += 1
 
-                    if msg['seq'] == self.currCount:
-                        self.send({"type": "ack", "seq": msg['seq']})
-                        # Print out the data to stdout
-                        print(msg["data"], end='', flush=True)
-                        # Added printed message
-                        self.MSGPrinted.append(msg)
-                        self.currCount += 1
+                while self.currCount in self.MSGtoPrint.keys():
+                    print(self.MSGtoPrint.get(self.currCount), end='', flush=True)
+                    self.currCount += 1
 
-                    while self.currCount in self.MSGtoPrint.keys():
-                        self.send({"type": "ack", "seq": self.currCount})
-                        print(self.MSGtoPrint.get(self.currCount), end='', flush=True)
-                        self.currCount += 1
-
-                    else:
-                        self.MSGtoPrint[msg['seq']] = msg['data']
+                else:
+                    self.MSGtoPrint[msg['seq']] = msg['data']
 
 
         return
